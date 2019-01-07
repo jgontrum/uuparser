@@ -7,16 +7,20 @@ from collections import defaultdict
 import codecs, re, os
 
 class FeatureExtractor(object):
-    def __init__(self, model, options, vocab, nnvecs, elmo):
+    def __init__(self, model, options, vocab, nnvecs, elmo, bert):
 
         self.word_counts, words, chars, pos, cpos, self.irels, treebanks, langs = vocab
 
         self.model = model
         self.nnvecs = nnvecs
         self.elmo = elmo
+        self.bert = bert
 
         if self.elmo:
             self.elmo.init_weights(model)
+
+        if self.bert:
+            self.bert.init_weights(model)
 
         extra_words = 2 # MLP padding vector and OOV vector
         self.words = {word: ind for ind, word in enumerate(words,extra_words)}
@@ -45,8 +49,9 @@ class FeatureExtractor(object):
             self.init_lookups(options)
 
         elmo_emb_size = self.elmo.emb_dim if self.elmo else 0
+        bert_emb_size = self.bert.output_dim if self.bert else 0
         self.lstm_input_size = (
-                options.word_emb_size + elmo_emb_size +
+                options.word_emb_size + elmo_emb_size + bert_emb_size +
                 options.pos_emb_size + options.tbank_emb_size +
                 2 * (options.char_lstm_output_size
                      if options.char_emb_size > 0 else 0)
@@ -77,6 +82,7 @@ class FeatureExtractor(object):
     def Init(self,options):
         paddingWordVec = self.word_lookup[1] if options.word_emb_size > 0 else None
         paddingElmoVec = dy.zeros(self.elmo.emb_dim) if self.elmo else None
+        paddingBertVec = dy.zeros(self.bert.output_dim) if self.bert else None
         paddingPosVec = self.pos_lookup[1] if options.pos_emb_size > 0 else None
         paddingCharVec = self.charPadding.expr() if options.char_emb_size > 0 else None
         paddingTbankVec = self.treebank_lookup[0] if options.tbank_emb_size > 0 else None
@@ -84,6 +90,7 @@ class FeatureExtractor(object):
         self.paddingVec = dy.tanh(self.word2lstm.expr() *\
             dy.concatenate(filter(None,[paddingWordVec,
                                         paddingElmoVec,
+                                        paddingBertVec,
                                         paddingPosVec,
                                         paddingCharVec,
                                         paddingTbankVec])) + self.word2lstmbias.expr())
@@ -98,6 +105,12 @@ class FeatureExtractor(object):
 
             elmo_sentence_representation = \
                 self.elmo.get_sentence_representation(sentence_text)
+
+        if self.bert:
+            sentence_text = " ".join([entry.form for entry in sentence[:-1]])
+
+            bert_sentence_representation = \
+                self.bert.get_sentence_representation(sentence_text)
 
         for i, root in enumerate(sentence):
             root.vecs = defaultdict(lambda: None) # all vecs are None by default (possibly a little risky?)
@@ -135,8 +148,14 @@ class FeatureExtractor(object):
                     # Don't look up the 'root' word
                     root.vecs["elmo"] = elmo_sentence_representation[i]
                 else:
-                    # TODO
                     root.vecs["elmo"] = dy.zeros(self.elmo.emb_dim)
+
+            if self.bert:
+                if i < len(sentence) - 1:
+                    # Don't look up the 'root' word
+                    root.vecs["bert"] = bert_sentence_representation[i]
+                else:
+                    root.vecs["bert"] = dy.zeros(self.bert.output_dim)
 
             root.vec = dy.concatenate(filter(None, [root.vecs["word"],
                                                     root.vecs["elmo"],

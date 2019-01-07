@@ -1,3 +1,4 @@
+from bert import BERT
 from elmo import ELMo
 from utils import ParseForest, read_conll, write_conll
 from operator import itemgetter
@@ -37,6 +38,12 @@ class ArcHybridLSTM:
             options.elmo_learn_gamma
         ) if options.elmo is not None else None
 
+        # Load BERT if the option is set
+        self.bert = BERT(
+            options.bert,
+            options.bert_mode
+        ) if options.bert is not None else None
+
         self.headFlag = options.headFlag
         self.rlMostFlag = options.rlMostFlag
         self.rlFlag = options.rlFlag
@@ -45,7 +52,7 @@ class ArcHybridLSTM:
         #dimensions depending on extended features
         self.nnvecs = (1 if self.headFlag else 0) + (2 if self.rlFlag or self.rlMostFlag else 0)
         self.feature_extractor = FeatureExtractor(
-            self.model, options, vocab, self.nnvecs, self.elmo)
+            self.model, options, vocab, self.nnvecs, self.elmo, self.bert)
         self.irels = self.feature_extractor.irels
 
         if options.no_bilstms > 0:

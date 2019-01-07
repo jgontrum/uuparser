@@ -149,6 +149,12 @@ if __name__ == '__main__':
     parser.add_option("--elmo_learn_gamma", action="store_true",
                       default=False, help="Learn the gamma factor for ELMo.")
 
+    parser.add_option("--bert", metavar="FILE", default=None,
+                      help="JSONL file that contains BERT layers for sentences.")
+    parser.add_option("--bert_mode", metavar="str", default="concatenate",
+                      help="Describes the handling of the BERT layers. "
+                           "Options: concatenate, sum, weighted_average")
+
     group = OptionGroup(parser, "Experiment options")
     group.add_option("--include", metavar="LIST", help="List of languages by ISO code to be run \
 if using UD. If not specified need to specify trainfile at least. When used in combination with \
