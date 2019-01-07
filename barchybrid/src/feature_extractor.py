@@ -159,6 +159,7 @@ class FeatureExtractor(object):
 
             root.vec = dy.concatenate(filter(None, [root.vecs["word"],
                                                     root.vecs["elmo"],
+                                                    root.vecs["bert"],
                                                     root.vecs["pos"],
                                                     root.vecs["char"],
                                                     root.vecs["treebank"]]))

@@ -29,11 +29,11 @@ class BERT(object):
             raise ValueError("BERT: Unsupported mode: %s" % self.mode)
 
     def get_sentence_representation(self, sentence):
-        sentence_data = self.sentence_to_layers.get(sentence)
+        sentence_data = self.sentence_to_layers.get(sentence.lower())
         if not sentence_data:
             raise ValueError(
-                "The sentence '%s' could not be found in the BERT data."
-                % sentence
+                "The sentence '%s' could not be found in the BERT data." \
+                % sentence.lower()
             )
 
         return BERT.Sentence(sentence_data, self)
@@ -54,6 +54,9 @@ class BERT(object):
 
         sentence_to_layers = {}
         for line in open(bert_file):
+            if not line:
+                continue
+
             sentence_data = json.loads(line)
 
             tokens = [
@@ -61,26 +64,28 @@ class BERT(object):
             ]
 
             # Ignore the first and the last meta token
-            token = tokens[1:-1]
+            tokens = tokens[1:-1]
 
             token_layers = []
             for token_data in sentence_data["features"]:
-                if token_data["token"] in ["SEP", "CLS"]:  # TODO
+                if token_data["token"] in ["[SEP]", "[CLS]"]:  # TODO
                     # Ignore the tokens at beginning and end of the sentence
                     continue
 
-                # Extract the layers for this token, sorted by the layer index
+                if token_data["token"].startswith("##"):
+                    continue
+
+                # Extract the layers for this token
                 layers = [
-                    layer["value"] for _, layer in sorted(
-                        token_data["layers"].iteritems(), key=lambda x: x[0])
+                    layer["values"] for layer in token_data["layers"]
                 ]
 
                 layers = np.array(layers, dtype=float)
                 token_layers.append(layers)
 
-            assert len(token_layers) == len(tokens)
-
             sentence = " ".join(tokens)
+            sentence = sentence.replace(" ##", "")
+            print sentence
             sentence_to_layers[sentence] = token_layers
 
         return sentence_to_layers
@@ -98,9 +103,7 @@ class BERT(object):
             :return: Embedding for the word
             """
             if self.bert.mode == "concatenate":
-                return dy.inputTensor(
-                    np.concatenate(*self.sentence_weights[i], axis=0)
-                )
+                return dy.inputTensor(self.sentence_weights[i].flatten())
 
             elif self.bert.mode == "sum":
                 return dy.inputTensor(np.sum(self.sentence_weights[i]))
