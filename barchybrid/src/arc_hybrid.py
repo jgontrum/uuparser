@@ -41,6 +41,7 @@ class ArcHybridLSTM:
         # Load BERT if the option is set
         self.bert = BERT(
             options.bert,
+            options.bert_token_mapping,
             options.bert_mode
         ) if options.bert is not None else None
 

@@ -151,6 +151,10 @@ if __name__ == '__main__':
 
     parser.add_option("--bert", metavar="FILE", default=None,
                       help="JSONL file that contains BERT layers for sentences.")
+    parser.add_option("--bert_token_mapping", metavar="FILE", default=None,
+                      help="JSONL file that contains an index mapping from "
+                           "BERT tokenized sentences to the treebank "
+                           "segmentation.")
     parser.add_option("--bert_mode", metavar="str", default="concatenate",
                       help="Describes the handling of the BERT layers. "
                            "Options: concatenate, sum, weighted_average")

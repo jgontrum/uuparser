@@ -6,12 +6,13 @@ import numpy as np
 
 class BERT(object):
 
-    def __init__(self, bert_file, bert_mode):
+    def __init__(self, bert_file, token_mapping_file, bert_mode):
         self.mode = bert_mode
         self.weights = []
 
         # Map the tokenized sentence to a list of the BERT layers
-        self.sentence_to_layers = self._get_sentence_to_layers(bert_file)
+        self.sentence_to_layers = self._get_sentence_to_layers(
+            bert_file, token_mapping_file)
 
         # Determine the numbers of layers and their dimensions
         tokens = next(self.sentence_to_layers.itervalues())
@@ -29,11 +30,11 @@ class BERT(object):
             raise ValueError("BERT: Unsupported mode: %s" % self.mode)
 
     def get_sentence_representation(self, sentence):
-        sentence_data = self.sentence_to_layers.get(sentence.lower())
+        sentence_data = self.sentence_to_layers.get(sentence)
         if not sentence_data:
             raise ValueError(
                 "The sentence '%s' could not be found in the BERT data." \
-                % sentence.lower()
+                % sentence
             )
 
         return BERT.Sentence(sentence_data, self)
@@ -49,43 +50,36 @@ class BERT(object):
                 scale=1.0
             )
 
-    def _get_sentence_to_layers(self, bert_file):
+    def _get_sentence_to_layers(self, bert_file, mapping_file):
         print "Reading BERT embeddings from '%s'" % bert_file
 
         sentence_to_layers = {}
-        for line in open(bert_file):
-            if not line:
-                continue
+        for bert_raw, mapping_raw in zip(open(bert_file), open(mapping_file)):
+            sentence_data = json.loads(bert_raw)
+            token_mapping = json.loads(mapping_raw)
 
-            sentence_data = json.loads(line)
+            # Gold segmented sentence from the treebank
+            sentence = token_mapping["sentence"]
 
-            tokens = [
-                feature["token"] for feature in sentence_data["features"]
-            ]
+            # Check that this is the right mapping for the sentence
+            bert_sentence = " ".join(
+                [item["token"] for item in sentence_data["features"]]
+            )
 
-            # Ignore the first and the last meta token
-            tokens = tokens[1:-1]
+            assert token_mapping["bert_sentence"] == bert_sentence, \
+                "BERT sentence missmatch. Is the mapping file correct?"
 
+            # Select token layers based on mapping
             token_layers = []
-            for token_data in sentence_data["features"]:
-                if token_data["token"] in ["[SEP]", "[CLS]"]:  # TODO
-                    # Ignore the tokens at beginning and end of the sentence
-                    continue
-
-                if token_data["token"].startswith("##"):
-                    continue
-
-                # Extract the layers for this token
+            for token_index in token_mapping["token_map"]:
                 layers = [
-                    layer["values"] for layer in token_data["layers"]
+                    layer["values"] for layer in
+                    sentence_data["features"][token_index]["layers"]
                 ]
 
                 layers = np.array(layers, dtype=float)
                 token_layers.append(layers)
 
-            sentence = " ".join(tokens)
-            sentence = sentence.replace(" ##", "")
-            print sentence
             sentence_to_layers[sentence] = token_layers
 
         return sentence_to_layers
