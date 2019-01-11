@@ -6,13 +6,14 @@ import numpy as np
 
 class BERT(object):
 
-    def __init__(self, bert_file, token_mapping_file, bert_mode):
+    def __init__(self, bert_file, token_mapping_file, bert_mode,
+                 multitoken_selection_strategy):
         self.mode = bert_mode
         self.weights = []
 
         # Map the tokenized sentence to a list of the BERT layers
         self.sentence_to_layers = self._get_sentence_to_layers(
-            bert_file, token_mapping_file)
+            bert_file, token_mapping_file, multitoken_selection_strategy)
 
         # Determine the numbers of layers and their dimensions
         tokens = next(self.sentence_to_layers.itervalues())
@@ -50,7 +51,8 @@ class BERT(object):
                 scale=1.0
             )
 
-    def _get_sentence_to_layers(self, bert_file, mapping_file):
+    def _get_sentence_to_layers(self, bert_file, mapping_file,
+                                multitoken_selection_strategy):
         print "Reading BERT embeddings from '%s'" % bert_file
 
         sentence_to_layers = {}
@@ -69,13 +71,58 @@ class BERT(object):
             assert token_mapping["bert_sentence"] == bert_sentence, \
                 "BERT sentence missmatch. Is the mapping file correct?"
 
-            # Select token layers based on mapping
             token_layers = []
-            for token_index in token_mapping["token_map"]:
-                layers = [
-                    layer["values"] for layer in
-                    sentence_data["features"][token_index]["layers"]
-                ]
+            num_gold_tokens = len(token_mapping["token_map"])
+            num_bert_tokens = len(sentence_data["features"])
+
+            # Select token layers based on mapping
+            for i, token_index in enumerate(token_mapping["token_map"]):
+                # Check if for this gold token, there are multiple
+                # BERT tokens
+                token_span_length = 1
+                if i == num_gold_tokens - 1:
+                    # This is the last token.
+                    token_span_length = num_bert_tokens - token_index - 1
+                else:
+                    # Look at the index of the next gold token to check for
+                    # multi tokens.
+                    next_index = token_mapping["token_map"][i + 1]
+                    if next_index > token_index + 1:
+                        token_span_length = next_index - token_index
+
+                if token_span_length > 1:
+                    token_data = {}
+                    # BERT has multiple representations for this gold token
+                    if multitoken_selection_strategy in ["first", "last"]:
+                        if multitoken_selection_strategy == "first":
+                            token_data = sentence_data["features"][token_index]
+
+                        elif multitoken_selection_strategy == "last":
+                            index = token_index + token_span_length - 1
+                            token_data = sentence_data["features"][index]
+
+                        layers = [
+                            layer["values"] for layer in token_data["layers"]
+                        ]
+
+                    elif multitoken_selection_strategy == "average":
+                        tokens = sentence_data["features"]\
+                            [token_index:token_index + token_span_length]
+                        layers = [
+                            [layer["values"] for layer in token["layers"]]
+                            for token in tokens
+                        ]
+                        layers = np.mean(np.array(layers, dtype=float), axis=0)
+
+                    else:
+                        raise ValueError(
+                            "Invalid BERT multitoken selection strategy: '%s'"
+                            % multitoken_selection_strategy)
+                else:
+                    token_data = sentence_data["features"][token_index]
+                    layers = [
+                        layer["values"] for layer in token_data["layers"]
+                    ]
 
                 layers = np.array(layers, dtype=float)
                 token_layers.append(layers)

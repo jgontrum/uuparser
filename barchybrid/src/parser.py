@@ -158,6 +158,11 @@ if __name__ == '__main__':
     parser.add_option("--bert_mode", metavar="str", default="concatenate",
                       help="Describes the handling of the BERT layers. "
                            "Options: concatenate, sum, weighted_average")
+    parser.add_option("--bert_multitoken_selection", metavar="str",
+                      default="first",
+                      help="Strategy to chose a token, in case BERT split"
+                           "up a gold segmented token into multiple ones."
+                           "Options: first, last, average")
 
     group = OptionGroup(parser, "Experiment options")
     group.add_option("--include", metavar="LIST", help="List of languages by ISO code to be run \
