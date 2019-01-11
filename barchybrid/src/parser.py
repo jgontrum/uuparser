@@ -157,7 +157,11 @@ if __name__ == '__main__':
                            "segmentation.")
     parser.add_option("--bert_mode", metavar="str", default="concatenate",
                       help="Describes the handling of the BERT layers. "
-                           "Options: concatenate, sum, weighted_average")
+                           "Options: concatenate, sum, weighted_average, "
+                           "finetune")
+    parser.add_option("--bert_layer_size", metavar="int", type=int,
+                      default=1024, help="If BERT mode is 'finetune', set the"
+                                         "size of the new layer.")
     parser.add_option("--bert_multitoken_selection", metavar="str",
                       default="first",
                       help="Strategy to chose a token, in case BERT split"

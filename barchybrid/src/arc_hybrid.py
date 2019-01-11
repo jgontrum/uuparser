@@ -43,7 +43,8 @@ class ArcHybridLSTM:
             options.bert,
             options.bert_token_mapping,
             options.bert_mode,
-            options.bert_multitoken_selection
+            options.bert_multitoken_selection,
+            options.bert_layer_size
         ) if options.bert is not None else None
 
         self.headFlag = options.headFlag

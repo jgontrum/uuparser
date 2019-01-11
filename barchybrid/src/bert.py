@@ -7,9 +7,12 @@ import numpy as np
 class BERT(object):
 
     def __init__(self, bert_file, token_mapping_file, bert_mode,
-                 multitoken_selection_strategy):
+                 multitoken_selection_strategy, output_layer_size):
         self.mode = bert_mode
-        self.weights = []
+
+        # Initialize parameters that might be used depending on the mode.
+        self.weights, self.finetune_w1, self.finetune_b1 = None, None, None
+        self.finetune_activation = dy.rectify
 
         # Map the tokenized sentence to a list of the BERT layers
         self.sentence_to_layers = self._get_sentence_to_layers(
@@ -27,6 +30,8 @@ class BERT(object):
             self.output_dim = self.emb_dim
         elif self.mode == "sum":
             self.output_dim = self.emb_dim
+        elif self.mode == "finetune":
+            self.output_dim = output_layer_size
         else:
             raise ValueError("BERT: Unsupported mode: %s" % self.mode)
 
@@ -41,7 +46,6 @@ class BERT(object):
         return BERT.Sentence(sentence_data, self)
 
     def init_weights(self, model):
-        # If a weighted average is computed, initialize the parameters
         if self.mode == "weighted_average":
             print "BERT: Learning a weighted average."
             self.weights = model.add_parameters(
@@ -49,6 +53,17 @@ class BERT(object):
                 name="bert-layer-weights",
                 init="uniform",
                 scale=1.0
+            )
+
+        if self.mode == "finetune":
+            print "BERT: Fine-tuning via separate layer."
+            self.finetune_w1 = model.add_parameters(
+                (self.output_dim, self.emb_dim * self.num_layers),
+                name="bert-finetune-W1"
+            )
+            self.finetune_b1 = model.add_parameters(
+                self.output_dim,
+                name="bert-finetune-b1"
             )
 
     def _get_sentence_to_layers(self, bert_file, mapping_file,
@@ -106,7 +121,7 @@ class BERT(object):
                         ]
 
                     elif multitoken_selection_strategy == "average":
-                        tokens = sentence_data["features"]\
+                        tokens = sentence_data["features"] \
                             [token_index:token_index + token_span_length]
                         layers = [
                             [layer["values"] for layer in token["layers"]]
@@ -161,5 +176,11 @@ class BERT(object):
                 ]
 
                 return dy.esum(y_hat)
+
+            elif self.bert.mode == "finetune":
+                x = dy.inputTensor(self.sentence_weights[i].flatten())
+                return self.bert.finetune_activation(
+                    self.bert.finetune_w1 * x + self.bert.finetune_b1
+                )
 
             raise ValueError("BERT: Unsupported mode: %s" % self.bert.mode)
