@@ -100,7 +100,8 @@ class BERT(object):
                 return dy.inputTensor(self.sentence_weights[i].flatten())
 
             elif self.bert.mode == "sum":
-                return dy.inputTensor(np.sum(self.sentence_weights[i]))
+                return dy.inputTensor(
+                    np.sum(np.array(self.sentence_weights[i])))
 
             elif self.bert.mode == "weighted_average":
                 normalized_weights = dy.softmax(self.bert.weights)
