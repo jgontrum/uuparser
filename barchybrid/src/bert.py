@@ -12,7 +12,7 @@ class BERT(object):
 
         # Initialize parameters that might be used depending on the mode.
         self.weights, self.finetune_w1, self.finetune_b1 = None, None, None
-        self.finetune_activation = dy.rectify
+        self.finetune_activation = dy.tanh
 
         # Map the tokenized sentence to a list of the BERT layers
         self.sentence_to_layers = self._get_sentence_to_layers(
